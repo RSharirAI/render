@@ -13,31 +13,9 @@ app.use (express.json())
 app.use(morgan('tiny'))
 app.use(express.static('dist'))
 
-const password = process.argv[2]
-const url = `mongodb+srv://sharirlearning:${password}@cluster0.kz5xwbh.mongodb.net/noteApp?retryWrites=true&w=majority&appName=Cluster0
-`
-mongoose.set('strictQuery',false)
-mongoose.connect(url)
-  .then(() => {
-    console.log('Connected to MongoDB successfully!')
-  })
-  .catch((error) => {
-    console.error('Error connecting to MongoDB:', error.message)
-  })
-
-const noteSchema = new mongoose.Schema({
-    content: String,
-    important: Boolean,
+app.get('/', (request, response) => {
+    console.log('connection set')
 })
-
-noteSchema.set('toJSON', {
-    transform: (document, returnedObject) => {
-        returnedObject.id = returnedObject._id.toString()
-        delete returnedObject._id
-        delete returnedObject.__v
-    }
-})
-
 app.get('/api/notes', (request, response) => {
     Note.find({})
     .then(notes => {
