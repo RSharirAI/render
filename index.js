@@ -1,6 +1,9 @@
+require('dotenv').config()
 const express = require('express')
 const morgan = require('morgan')
-const cors = require('cors')
+const mongoose = require('mongoose')
+const Note = require('./models/note')
+
 
 const app = express()
 
@@ -8,54 +11,53 @@ app.use (express.json())
 
 //**Middleware function */
 app.use(morgan('tiny'))
-app.use(cors())
 app.use(express.static('dist'))
 
-let notes = [
-  {
-    id: "1",
-    content: "HTML is easy",
-    important: true
-  },
-  {
-    id: "2",
-    content: "Browser can execute only JavaScript",
-    important: false
-  },
-  {
-    id: "3",
-    content: "GET and POST are the most important methods of HTTP protocol",
-    important: true
-  }
-]
+const password = process.argv[2]
+const url = `mongodb+srv://sharirlearning:${password}@cluster0.kz5xwbh.mongodb.net/noteApp?retryWrites=true&w=majority&appName=Cluster0
+`
+mongoose.set('strictQuery',false)
+mongoose.connect(url)
+  .then(() => {
+    console.log('Connected to MongoDB successfully!')
+  })
+  .catch((error) => {
+    console.error('Error connecting to MongoDB:', error.message)
+  })
 
-app.get('/api/notes', (request, response) => {
-    response.json(notes)
+const noteSchema = new mongoose.Schema({
+    content: String,
+    important: Boolean,
 })
 
-app.get('/api/notes/:id', (request, response) => {
-    const id = request.params.id
-    const note = notes.find(note => note.id === id)
-    if (note) {
-        response.json(note)
-    } else {
-        response.status(404).end()
+noteSchema.set('toJSON', {
+    transform: (document, returnedObject) => {
+        returnedObject.id = returnedObject._id.toString()
+        delete returnedObject._id
+        delete returnedObject.__v
     }
 })
 
-app.delete('/api/notes/:id', (request, response) => {
-    const id = request.params.id
-    notes = notes.filter(note => note.id !== id)
-
-    response.status(204).end()
+app.get('/api/notes', (request, response) => {
+    Note.find({})
+    .then(notes => {
+        response.json(notes)
+    })
 })
 
-const generateId = () => {
-    const maxId= notes.length > 0 
-        ? Math.max(...notes.map(note => Number(note.id))) 
-        : 0
-    return String(maxId + 1)
-}
+app.get('/api/notes/:id', (request, response) => {
+    Note.findById(request.params.id).then(note => {
+        response.json(note)
+    })
+})
+
+app.delete('/api/notes/:id', (request, response) => {
+    Note.findByIdAndDelete(request.params.id)
+    // const id = request.params.id
+    // notes = notes.filter(note => note.id !== id)
+
+    // response.status(204).end()
+})
 
 app.post('/api/notes', (request,response) => {
     const body = request.body
@@ -66,14 +68,14 @@ app.post('/api/notes', (request,response) => {
         })
     }
 
-
-    const note = {
+    const note = new Note({
         content: body.content,
         important: body.important || false,
-        id: generateId()
-    }
-    notes = notes.concat(note)
-    response.json(note)
+    })
+
+    note.save().then(savedNote => {
+        response.json(savedNote)
+    })
 })
 
 //** Middleware function */
@@ -84,7 +86,7 @@ const unknownEndpoint = (request, response) => {
 app.use(unknownEndpoint)
 
 
-const PORT = process.env.PORT || 3001
+const PORT = process.env.PORT
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`)
 })
